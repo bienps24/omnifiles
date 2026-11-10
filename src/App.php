@@ -1,0 +1,85 @@
+<?php
+/**
+ * OmniFiles bootstrap: autoload + config.
+ */
+
+spl_autoload_register(function (string $class): void {
+    $base = __DIR__ . '/';
+    $path = $base . str_replace('\\', '/', $class) . '.php';
+    if (is_file($path)) {
+        require $path;
+    }
+});
+
+date_default_timezone_set('UTC');
+mb_internal_encoding('UTF-8');
+
+final class App
+{
+    public const VERSION = '1.0.0';
+
+    /** Read an environment variable with a default. */
+    public static function env(string $key, ?string $default = null): ?string
+    {
+        $value = getenv($key);
+        if ($value === false || $value === '') {
+            return $default;
+        }
+        return $value;
+    }
+
+    public static function root(): string
+    {
+        return dirname(__DIR__);
+    }
+
+    /** Telegram user id of the OmniFiles owner (admin). */
+    public static function adminId(): int
+    {
+        return (int) self::env('ADMIN_ID', '0');
+    }
+
+    /** Public base URL, e.g. https://files.omnigate.info */
+    public static function publicUrl(): string
+    {
+        return rtrim((string) self::env('PUBLIC_URL', ''), '/');
+    }
+
+    /** Channel people must join before cloning, e.g. @omnigatework */
+    public static function newsChannel(): string
+    {
+        return (string) self::env('NEWS_CHANNEL', '@omnigatework');
+    }
+
+    /** Private channel id (e.g. -100123...) where the main bot keeps a copy of every file. */
+    public static function backupChat(): ?int
+    {
+        $value = self::env('BACKUP_CHAT_ID');
+        return $value === null ? null : (int) $value;
+    }
+
+    public static function proPrice(): int
+    {
+        return (int) self::env('PRO_PRICE_STARS', '300');
+    }
+
+    public static function slotPrice(): int
+    {
+        return (int) self::env('SLOT_PRICE_STARS', '999');
+    }
+
+    /** Link for the "Contact admin" button. */
+    public static function contactUrl(): string
+    {
+        $username = self::env('CONTACT_USERNAME');
+        if ($username !== null) {
+            return 'https://t.me/' . ltrim($username, '@');
+        }
+        return 'tg://user?id=' . self::adminId();
+    }
+
+    public static function log(string $message): void
+    {
+        error_log('[omnifiles] ' . $message);
+    }
+}
