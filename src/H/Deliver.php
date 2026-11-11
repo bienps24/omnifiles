@@ -119,7 +119,9 @@ final class Deliver
     public static function deliver(Ctx $c, array $link, bool $isResend, bool $isNewUser): void
     {
         $files = Db::all('SELECT * FROM files WHERE link_id = ? ORDER BY position', [(int) $link['id']]);
-        $protect = (bool) $link['protect'];
+        $ownerLocked = (bool) $link['protect'];
+        $canSave = !$ownerLocked && self::viewerCanSave($c, $link);
+        $protect = !$canSave;
         $sent = [];
 
         if ($link['intro']) {
@@ -145,6 +147,17 @@ final class Deliver
             $text .= "\n🔁 " . $c->t('files_resend_hint');
         }
         $rows = [];
+        // Upsell: the files are locked only because this viewer isn't Pro
+        if (!$ownerLocked && !$canSave) {
+            $text .= "\n\n" . Ui::quote('🔒 ' . $c->t('save_upsell', ['n' => App::proPrice()]));
+            $rows[] = [Ui::urlBtn(
+                $c,
+                '⭐ ' . $c->t('btn_save_pro', ['n' => App::proPrice()]),
+                'https://t.me/' . App::payBot() . '?start=ofiles_pro',
+                'success',
+                'star'
+            )];
+        }
         if ($link['resend']) {
             $rows[] = [Ui::btn($c, '🔁 ' . $c->t('btn_get_again'), 'get:' . $link['id'], 'success', 'resend')];
         }
@@ -180,6 +193,21 @@ final class Deliver
              ON CONFLICT (link_id, user_id) DO UPDATE SET times = opens.times + 1, last_at = now()',
             [(int) $link['id'], $c->uid, $isNewUser]
         );
+    }
+
+    /**
+     * Files can be saved and forwarded by the link owner and by Pro users.
+     * Pro is per person and works on every bot, clones included.
+     */
+    private static function viewerCanSave(Ctx $c, array $link): bool
+    {
+        if ($c->uid === null) {
+            return false;
+        }
+        if ((int) $link['owner_id'] === $c->uid) {
+            return true;
+        }
+        return (bool) Ctx::account($c->uid)['is_pro'];
     }
 
     /** Split files into sendable groups: albums of up to 10 of the same family, others alone. */

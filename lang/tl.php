@@ -101,7 +101,7 @@ return [
     't_defaults' => 'Default settings',
     'defaults_text' => "Kusang nalalagay ang settings na ito sa bawat bagong link.\nPara sa iisang link lang, buksan ito sa 🗂 Mga Link Ko → 🎚 Limits.",
     'autodelete_note' => 'Nabubura ang files sa chat {time} matapos itong makuha.',
-    'protect_note' => 'Makikita ng tao ang files pero hindi nila ma-forward o ma-save.',
+    'protect_note' => 'Walang makaka-forward o makaka-save ng mga file na ito, kahit Pro user.',
     'set_language' => 'Wika',
     'set_timezone' => 'Time zone',
     'set_expires' => 'Expiry',
@@ -238,7 +238,9 @@ return [
 
     // Pro + payments
     'pro_point1' => 'Walang ads kahit saan sa OmniFiles.',
-    'pro_point_forward' => 'Puwede nang i-forward at i-save ang mga message ng bot.',
+    'pro_point_forward' => 'I-save at i-forward ang files mula sa kahit anong link, pati ang mga message ng bot.',
+    'save_upsell' => 'Gusto mo bang i-save o i-forward ang mga file na ito? Mag-Pro ka sa {n} ⭐, isang bayad lang, habambuhay na. Pagkatapos, buksan ulit ang link.',
+    'btn_save_pro' => 'I-save at i-forward · {n} ⭐',
     'pro_point2' => 'Isang bayad lang, sa iyo habambuhay.',
     'pro_point3' => '{n} Stars.',
     'pro_active' => 'Pro ka na ✨ Walang ads, habambuhay. Salamat!',
