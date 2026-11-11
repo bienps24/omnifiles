@@ -84,7 +84,7 @@ final class Pay
             $next = [];
         }
         $caption = Ui::title($c, 'party', '🎉', $c->t('t_thank_you')) . "\n\n" . Ui::quote($text);
-        Ui::show($c, 'pro', $caption, $next ?: ['reply' => Ui::menu($c)], true);
+        Ui::show($c, 'pro', $caption, $next ?: ['reply' => Ui::menu($c)], true, true);
 
         $admin = App::adminId();
         if ($admin) {

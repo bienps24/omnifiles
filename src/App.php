@@ -68,14 +68,14 @@ final class App
         return (int) self::env('SLOT_PRICE_STARS', '999');
     }
 
-    /** Link for the "Contact admin" button. */
-    public static function contactUrl(): string
+    /**
+     * Link for the "Contact admin" button, or null to hide it.
+     * Needs CONTACT_USERNAME: tg://user?id links are refused by Telegram when the admin's privacy settings hide them.
+     */
+    public static function contactUrl(): ?string
     {
         $username = self::env('CONTACT_USERNAME');
-        if ($username !== null) {
-            return 'https://t.me/' . ltrim($username, '@');
-        }
-        return 'tg://user?id=' . self::adminId();
+        return $username === null ? null : 'https://t.me/' . ltrim($username, '@');
     }
 
     public static function log(string $message): void

@@ -94,7 +94,8 @@ final class Upload
         $caption = Ui::title($c, 'done', '✅', $c->t('t_link_ready')) . "\n\n"
             . Ui::quote('📚 ' . Ui::esc($link['title']) . ' · ' . $c->t('n_files', ['n' => $sum['files']])) . "\n"
             . '🔗 ' . Ui::esc($url) . "\n\n"
-            . '<i>' . $c->t('link_ready_hint') . '</i>';
+            . '<i>' . $c->t('link_ready_hint') . '</i>'
+            . Ui::credit($c);
 
         $rows = [
             [
@@ -112,7 +113,7 @@ final class Upload
             $caption .= $ad[0];
             $rows[] = $ad[1];
         }
-        Ui::show($c, 'link_ready', $caption, $rows, $forceNew);
+        Ui::show($c, 'link_ready', $caption, $rows, $forceNew, true);
     }
 
     /* ---------------- Many Files ---------------- */

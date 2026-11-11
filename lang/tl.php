@@ -299,6 +299,7 @@ return [
     'btn_buy_pro' => 'Kumuha ng Pro · {n} ⭐',
 
     // Misc
+    'made_by' => 'Gawa ng {bot}',
     'cancelled' => 'Na-cancel',
     'you_are_banned' => '🚫 Na-ban ka sa bot na ito.',
 ];

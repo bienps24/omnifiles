@@ -139,6 +139,9 @@ final class Router
         ];
         foreach ($menu as $key => $run) {
             if ($text !== '' && in_array($text, Lang::allOf($key), true)) {
+                if (in_array($c->state(), ['many', 'add'], true)) {
+                    $c->setState(null);
+                }
                 $run();
                 return;
             }

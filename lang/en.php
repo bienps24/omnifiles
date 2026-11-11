@@ -11,7 +11,7 @@ return [
 
     // Language + welcome
     't_language' => 'Language',
-    'language_prompt_all' => 'Choose your language · Pumili ng wika',
+    'language_prompt_all' => 'Choose your language · Pumili ng wika · Elige tu idioma · Escolha o idioma · Выберите язык · اختر لغتك · अपनी भाषा चुनें · Pilih bahasa · Choisissez votre langue · Sprache wählen · Dilini seç · 选择语言 · 言語を選択 · 언어 선택',
     't_welcome' => 'Send me any file',
     'step_send' => 'Send me a file.',
     'step_link' => 'I give you a link.',
@@ -303,6 +303,7 @@ return [
     'btn_buy_pro' => 'Get Pro · {n} ⭐',
 
     // Misc
+    'made_by' => 'Made by {bot}',
     'cancelled' => 'Cancelled',
     'you_are_banned' => '🚫 You were banned from this bot.',
 ];

@@ -9,6 +9,18 @@ final class Lang
     public const LANGS = [
         'en' => ['🌐', 'English', 0],
         'tl' => ['🇵🇭', 'Filipino', 480],
+        'es' => ['🇪🇸', 'Español', -300],
+        'pt' => ['🇧🇷', 'Português', -180],
+        'ru' => ['🇷🇺', 'Русский', 180],
+        'ar' => ['🇸🇦', 'العربية', 180],
+        'hi' => ['🇮🇳', 'हिन्दी', 330],
+        'id' => ['🇮🇩', 'Indonesia', 420],
+        'fr' => ['🇫🇷', 'Français', 60],
+        'de' => ['🇩🇪', 'Deutsch', 60],
+        'tr' => ['🇹🇷', 'Türkçe', 180],
+        'zh' => ['🇨🇳', '中文', 480],
+        'ja' => ['🇯🇵', '日本語', 540],
+        'ko' => ['🇰🇷', '한국어', 540],
     ];
 
     private static array $cache = [];

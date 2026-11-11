@@ -71,7 +71,7 @@ final class Deliver
     private static function notice(Ctx $c, string $banner, string $titleKey, string $textKey): void
     {
         $caption = Ui::title($c, 'info', 'ℹ️', $c->t($titleKey)) . "\n\n" . Ui::quote($c->t($textKey));
-        Ui::show($c, $banner, $caption, ['reply' => Ui::menu($c)], true);
+        Ui::show($c, $banner, $caption . Ui::credit($c), ['reply' => Ui::menu($c)], true, true);
     }
 
     public static function passwordText(Ctx $c, int $linkId, string $text): bool
@@ -154,13 +154,17 @@ final class Deliver
             $text .= $ad[0];
             $rows[] = $ad[1];
         }
-        $c->tg->call('sendMessage', [
+        $info = $c->tg->get('sendMessage', [
             'chat_id' => $c->chatId,
-            'text' => $text,
+            'text' => $text . Ui::credit($c),
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
+            'protect_content' => true,
             'reply_markup' => ['inline_keyboard' => $rows],
         ]);
+        if ($info && !$link['resend']) {
+            $sent[] = (int) $info['message_id'];
+        }
 
         if ($sent) {
             Db::q(

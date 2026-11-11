@@ -131,7 +131,7 @@ final class Clones
             . '• ' . $c->t('bot_limit_again');
         Ui::show($c, 'bot_limit', $caption, [
             [Ui::btn($c, '⭐ ' . $c->t('btn_buy_slot', ['n' => App::slotPrice()]), 'buy:slot', 'success', 'star')],
-            [Ui::urlBtn($c, '🎧 ' . $c->t('btn_contact'), App::contactUrl(), null, 'contact')],
+            ...(App::contactUrl() !== null ? [[Ui::urlBtn($c, '🎧 ' . $c->t('btn_contact'), App::contactUrl(), null, 'contact')]] : []),
             [Ui::back($c, 'cb')],
         ]);
     }
@@ -265,7 +265,7 @@ final class Clones
                 Ui::urlBtn($c, '📤 ' . $c->t('btn_share_bot'), Ui::shareUrl($url), null, 'share'),
                 Ui::btn($c, '⚙️ ' . $c->t('btn_bot_settings'), 'cv:' . $bot['id'], null, 'settings'),
             ],
-        ], $forceNew);
+        ], $forceNew, true);
     }
 
     private static function mine(Ctx $c, int $botId): ?array

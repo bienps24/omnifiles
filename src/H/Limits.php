@@ -13,7 +13,7 @@ final class Limits
 {
     public const EXPIRE_CHOICES = [3600, 86400, 604800, 2592000];
     public const PEOPLE_CHOICES = [1, 10, 100, 1000];
-    public const TZ_CHOICES = [-480, -300, 0, 60, 180, 330, 420, 480, 540, 600];
+    public const TZ_CHOICES = [-480, -300, -180, 0, 60, 180, 330, 420, 480, 540];
 
     /** Current values for a scope, or null if the link is not yours. */
     private static function load(Ctx $c, string $scope): ?array

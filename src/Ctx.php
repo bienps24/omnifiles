@@ -143,6 +143,7 @@ final class Ctx
             'text' => $html,
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
+            'protect_content' => true,
             'reply_markup' => $markup,
         ]);
     }

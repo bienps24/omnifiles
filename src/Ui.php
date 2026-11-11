@@ -172,25 +172,35 @@ final class Ui
      * Show a screen. Inside a button press it edits the pressed message; otherwise it sends a new one.
      * $rows: inline keyboard rows, or ['reply' => replyKeyboard] to attach the bottom menu instead.
      */
-    public static function show(Ctx $c, string $banner, string $caption, array $rows = [], bool $forceNew = false): ?array
+    /**
+     * $keep = false: a menu screen. Opening a new menu screen deletes the previous one, so the chat stays clean.
+     * $keep = true: a result the user keeps (link ready, bot ready, payment, notices): never auto-deleted.
+     */
+    public static function show(Ctx $c, string $banner, string $caption, array $rows = [], bool $forceNew = false, bool $keep = false): ?array
     {
         $markup = isset($rows['reply']) ? $rows['reply'] : ['inline_keyboard' => array_values($rows)];
         $canEdit = !$forceNew && !isset($rows['reply']) && $c->callback && !empty($c->callback['message']['photo']);
+        $previous = (int) ($c->user['ui_msg_id'] ?? 0);
 
         if ($canEdit) {
+            $messageId = (int) $c->callback['message']['message_id'];
             [$media, $files] = self::bannerMedia($c, $banner, 'banner');
             $res = $c->tg->call('editMessageMedia', [
                 'chat_id' => $c->chatId,
-                'message_id' => $c->callback['message']['message_id'],
+                'message_id' => $messageId,
                 'media' => ['type' => 'photo', 'media' => $media, 'caption' => $caption, 'parse_mode' => 'HTML'],
                 'reply_markup' => $markup,
             ], $files);
-            if ($res['ok']) {
-                self::rememberBanner($c, $banner, is_array($res['result']) ? $res['result'] : null);
-                return is_array($res['result']) ? $res['result'] : null;
-            }
-            if (str_contains((string) ($res['description'] ?? ''), 'not modified')) {
-                return $c->callback['message'];
+            $edited = $res['ok'] || str_contains((string) ($res['description'] ?? ''), 'not modified');
+            if ($edited) {
+                if ($res['ok']) {
+                    self::rememberBanner($c, $banner, is_array($res['result']) ? $res['result'] : null);
+                }
+                // A menu screen that turned into a result (e.g. Many Files → Link ready) must not be deleted later
+                if ($keep && $messageId === $previous) {
+                    self::setScreen($c, null);
+                }
+                return $res['ok'] && is_array($res['result']) ? $res['result'] : $c->callback['message'];
             }
         }
 
@@ -200,14 +210,44 @@ final class Ui
             'photo' => $files ? null : $media,
             'caption' => $caption,
             'parse_mode' => 'HTML',
+            'protect_content' => true,
             'reply_markup' => $markup,
         ];
         $res = $c->tg->call('sendPhoto', $params, $files ? ['photo' => $files['photo']] : []);
-        if ($res['ok']) {
-            self::rememberBanner($c, $banner, $res['result']);
-            return $res['result'];
+        if (!$res['ok']) {
+            return null;
         }
-        return null;
+        self::rememberBanner($c, $banner, $res['result']);
+        if (!$keep) {
+            if ($previous && $previous !== (int) $res['result']['message_id']) {
+                $c->tg->call('deleteMessage', ['chat_id' => $c->chatId, 'message_id' => $previous]);
+            }
+            self::setScreen($c, (int) $res['result']['message_id']);
+        }
+        return $res['result'];
+    }
+
+    /** Remember the current menu screen message (deleted when the next one opens). */
+    private static function setScreen(Ctx $c, ?int $messageId): void
+    {
+        if ($c->uid === null) {
+            return;
+        }
+        Db::q('UPDATE users SET ui_msg_id = ? WHERE bot_id = ? AND user_id = ?', [$messageId, $c->botId(), $c->uid]);
+        $c->user['ui_msg_id'] = $messageId;
+    }
+
+    /** "Made by @OmniFilesApp" line shown on clone bots. */
+    public static function credit(Ctx $c): string
+    {
+        if ($c->isMain) {
+            return '';
+        }
+        static $main = null;
+        if ($main === null) {
+            $main = (string) Db::val('SELECT username FROM bots WHERE is_main LIMIT 1');
+        }
+        return $main === '' ? '' : "\n\n⚡ " . $c->t('made_by', ['bot' => '@' . $main]);
     }
 
     /** Random active ad for free users: [caption line, button row] or null. */

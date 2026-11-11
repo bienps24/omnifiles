@@ -43,7 +43,7 @@ final class Start
         }
 
         $caption = Ui::title($c, 'language', '🌐', $c->t('t_language')) . "\n\n"
-            . Ui::quote($c->t('language_prompt_all'));
+            . Ui::quote(Lang::t('en', 'language_prompt_all'));
         Ui::show($c, 'language', $caption, $rows);
     }
 
@@ -64,6 +64,8 @@ final class Start
 
         if ($from === 's') {
             Limits::show($c, 'd');
+            // Send the bottom menu again so its buttons switch to the new language
+            self::welcome($c);
             return;
         }
         // Mark the choice on the picker, then send the welcome screen with the bottom menu
@@ -79,8 +81,9 @@ final class Start
                 . Ui::num(2) . ' ' . $c->t('step_link') . "\n"
                 . Ui::num(3) . ' ' . $c->t('step_share')
             ) . "\n"
-            . '💡 ' . $c->t('welcome_tip');
-        Ui::show($c, 'welcome', $caption, ['reply' => Ui::menu($c)], true);
+            . '💡 ' . $c->t('welcome_tip')
+            . Ui::credit($c);
+        Ui::show($c, 'welcome', $caption, ['reply' => Ui::menu($c)], true, true);
     }
 
     public static function help(Ctx $c): void
@@ -92,15 +95,18 @@ final class Start
         if ($c->isMain) {
             $lines .= "\n• " . $c->t('help_clones');
         }
-        $caption = Ui::title($c, 'help', '❓', $c->t('t_help')) . "\n\n" . Ui::quote($lines);
+        $caption = Ui::title($c, 'help', '❓', $c->t('t_help')) . "\n\n" . Ui::quote($lines) . Ui::credit($c);
 
-        $rows = [[Ui::urlBtn($c, '🎧 ' . $c->t('btn_contact'), App::contactUrl(), null, 'contact')]];
+        $rows = [];
+        if (App::contactUrl() !== null) {
+            $rows[] = [Ui::urlBtn($c, '🎧 ' . $c->t('btn_contact'), App::contactUrl(), null, 'contact')];
+        }
         $row = [Ui::btn($c, '🔒 ' . $c->t('btn_privacy'), 'pv', null, 'privacy')];
         if ($c->isMain) {
             $row[] = Ui::btn($c, '⭐ ' . $c->t('btn_pro'), 'pro', null, 'pro');
         }
         $rows[] = $row;
-        Ui::show($c, 'help', $caption, $rows);
+        Ui::show($c, 'help', $caption, $rows, $c->callback === null);
     }
 
     public static function privacy(Ctx $c): void
