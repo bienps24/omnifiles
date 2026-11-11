@@ -5,6 +5,10 @@ RUN apt-get update \
     && docker-php-ext-install pdo_pgsql \
     && rm -rf /var/lib/apt/lists/*
 
+# PHP runs on Apache's prefork MPM only
+RUN a2dismod mpm_event mpm_worker >/dev/null 2>&1 || true \
+    && a2enmod mpm_prefork
+
 ENV APACHE_DOCUMENT_ROOT=/var/www/app/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf \
     && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
