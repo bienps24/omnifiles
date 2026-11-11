@@ -16,6 +16,8 @@ use Ui;
  *   /banlink <code|url>     /unbanlink <code|url>
  *   /banuser <user id>      /unbanuser <user id>
  *   /banbot <@username|id>  /unbanbot <@username|id>
+ *   /link <code or link>    who uploaded a link, what is in it
+ *   /user <id|@username>    everything about one user: uploads, reports, bots
  *   /emojis                 every emoji the bot uses: Premium or still normal
  *   /setemoji 🔗📁✅         (Premium emoji) each replaces the normal emoji it is based on
  *   /setemoji 🗂 <Premium>   the Premium emoji replaces 🗂
@@ -66,12 +68,14 @@ final class Admin
             case '/banuser':
             case '/unbanuser':
                 $ban = $command === '/banuser';
-                $n = Db::q('UPDATE users SET banned = ? WHERE user_id = ?', [$ban, (int) $arg])->rowCount();
-                if ($ban) {
-                    Db::q('UPDATE links SET banned = TRUE WHERE owner_id = ?', [(int) $arg]);
-                    Db::q("UPDATE bots SET status = 'banned' WHERE owner_id = ?", [(int) $arg]);
-                }
+                $n = self::banUser((int) $arg, $ban);
                 $c->say($n ? '✅ User ' . ($ban ? 'banned (with their links and bots)' : 'unbanned') : '❌ User not found');
+                return true;
+            case '/user':
+                self::userInfo($c, $arg);
+                return true;
+            case '/link':
+                self::linkInfo($c, $arg);
                 return true;
             case '/banbot':
             case '/unbanbot':
@@ -252,6 +256,25 @@ final class Admin
             case 'rep':
                 self::reports($c);
                 return;
+            case 'rd':
+                self::reportScreen($c, (int) $arg);
+                return;
+            case 'bu':
+                $report = Db::one(
+                    'SELECT r.*, l.owner_id FROM reports r JOIN links l ON l.id = r.link_id WHERE r.id = ?',
+                    [(int) $arg]
+                );
+                if ($report) {
+                    self::banUser((int) $report['owner_id'], true);
+                    Db::q(
+                        "UPDATE reports SET status = 'banned' WHERE status = 'open'
+                         AND link_id IN (SELECT id FROM links WHERE owner_id = ?)",
+                        [(int) $report['owner_id']]
+                    );
+                }
+                $c->answer('Uploader banned, with all their links');
+                self::afterAction($c);
+                return;
             case 'bl':
             case 'ig':
                 $report = Db::one('SELECT * FROM reports WHERE id = ?', [(int) $arg]);
@@ -264,15 +287,7 @@ final class Admin
                     }
                 }
                 $c->answer($action === 'bl' ? 'Link banned' : 'Ignored');
-                if (!empty($c->callback['message']['photo'])) {
-                    self::reports($c);
-                } else {
-                    $c->tg->call('editMessageReplyMarkup', [
-                        'chat_id' => $c->chatId,
-                        'message_id' => $c->callback['message']['message_id'],
-                        'reply_markup' => ['inline_keyboard' => []],
-                    ]);
-                }
+                self::afterAction($c);
                 return;
         }
     }
@@ -309,26 +324,228 @@ final class Admin
         return true;
     }
 
+    /** After a report action: back to the list (panel screen) or clear the alert's buttons. */
+    private static function afterAction(Ctx $c): void
+    {
+        if (!empty($c->callback['message']['photo'])) {
+            self::reports($c);
+            return;
+        }
+        $c->tg->call('editMessageReplyMarkup', [
+            'chat_id' => $c->chatId,
+            'message_id' => $c->callback['message']['message_id'],
+            'reply_markup' => ['inline_keyboard' => []],
+        ]);
+    }
+
+    /** Ban or unban a user everywhere. Banning also bans their links and clone bots. Returns rows changed. */
+    private static function banUser(int $userId, bool $ban): int
+    {
+        $n = Db::q('UPDATE users SET banned = ? WHERE user_id = ?', [$ban, $userId])->rowCount();
+        if ($ban) {
+            Db::q('UPDATE links SET banned = TRUE WHERE owner_id = ?', [$userId]);
+            Db::q("UPDATE bots SET status = 'banned' WHERE owner_id = ? AND is_main = FALSE", [$userId]);
+        }
+        return $n;
+    }
+
+    /* ---------------- Who is who ---------------- */
+
+    /** "Juan Dela Cruz @juan · 123456" with a tap-able name. Prefers what the given bot knows. */
+    private static function person(int $userId, ?int $botId = null): string
+    {
+        $u = Db::one(
+            'SELECT first_name, username FROM users WHERE user_id = ?
+             ORDER BY (bot_id = ?) DESC, last_seen DESC LIMIT 1',
+            [$userId, $botId ?? 0]
+        );
+        $name = trim((string) ($u['first_name'] ?? '')) !== '' ? $u['first_name'] : 'User';
+        $line = '<a href="tg://user?id=' . $userId . '">' . Ui::esc(mb_strimwidth($name, 0, 32, '…')) . '</a>';
+        if (!empty($u['username'])) {
+            $line .= ' @' . Ui::esc($u['username']);
+        }
+        return $line . ' · <code>' . $userId . '</code>';
+    }
+
+    /** Short record of an uploader: Pro, links, files, reports against them, banned. */
+    private static function uploaderStats(int $userId): string
+    {
+        $links = (int) Db::val('SELECT COUNT(*) FROM links WHERE owner_id = ?', [$userId]);
+        $files = (int) Db::val('SELECT COUNT(*) FROM files f JOIN links l ON l.id = f.link_id WHERE l.owner_id = ?', [$userId]);
+        $against = (int) Db::val('SELECT COUNT(*) FROM reports r JOIN links l ON l.id = r.link_id WHERE l.owner_id = ?', [$userId]);
+        $acc = Ctx::account($userId);
+        $banned = (bool) Db::val('SELECT bool_or(banned) FROM users WHERE user_id = ?', [$userId]);
+        return ($acc['is_pro'] ? '⭐ Pro · ' : '')
+            . "$links links · $files files · reported {$against}×"
+            . ($banned ? ' · ⛔ banned' : '');
+    }
+
+    /** Short record of a reporter: how many reports, and how they were judged. */
+    private static function reporterStats(int $userId): string
+    {
+        $r = Db::one(
+            "SELECT COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE status = 'banned') AS banned,
+                    COUNT(*) FILTER (WHERE status = 'ignored') AS ignored
+             FROM reports WHERE reporter_id = ?",
+            [$userId]
+        );
+        return "{$r['total']} reports sent · {$r['banned']} led to a ban · {$r['ignored']} ignored";
+    }
+
+    /** What the link holds: "12 files (10 video, 2 photo) · 340 people opened". */
+    private static function linkContents(int $linkId): string
+    {
+        $kinds = Db::all('SELECT kind, COUNT(*) AS n FROM files WHERE link_id = ? GROUP BY kind ORDER BY n DESC', [$linkId]);
+        $total = array_sum(array_map(fn($k) => (int) $k['n'], $kinds));
+        $parts = array_map(fn($k) => $k['n'] . ' ' . $k['kind'], $kinds);
+        $people = (int) Db::val('SELECT COUNT(*) FROM opens WHERE link_id = ?', [$linkId]);
+        return "$total files" . ($parts ? ' (' . implode(', ', $parts) . ')' : '') . " · $people people opened";
+    }
+
+    /** The full report card, used by the alert and the panel. */
+    private static function reportText(int $reportId): ?string
+    {
+        $r = Db::one(
+            'SELECT r.*, l.id AS lid, l.code, l.title, l.owner_id, l.bot_id, l.banned AS link_banned, l.created_at AS link_created, b.username
+             FROM reports r JOIN links l ON l.id = r.link_id JOIN bots b ON b.id = l.bot_id WHERE r.id = ?',
+            [$reportId]
+        );
+        if ($r === null) {
+            return null;
+        }
+        $others = (int) Db::val('SELECT COUNT(*) FROM reports WHERE link_id = ?', [(int) $r['lid']]);
+        return "⚠️ <b>Report #{$r['id']}</b> · {$r['reason']} · " . $r['status'] . "\n"
+            . 'Reported ' . date('M j, H:i', strtotime($r['created_at'])) . " UTC · this link has $others report(s)\n\n"
+            . "🔗 <b>Link</b>\n"
+            . "https://t.me/{$r['username']}?start={$r['code']}\n"
+            . Ui::esc($r['title']) . "\n"
+            . self::linkContents((int) $r['lid'])
+            . ($r['link_banned'] ? "\n⛔ link banned" : '') . "\n\n"
+            . "📤 <b>Uploaded by</b>\n"
+            . self::person((int) $r['owner_id'], (int) $r['bot_id']) . "\n"
+            . self::uploaderStats((int) $r['owner_id']) . "\n\n"
+            . "🚩 <b>Reported by</b>\n"
+            . self::person((int) $r['reporter_id'], (int) $r['bot_id']) . "\n"
+            . self::reporterStats((int) $r['reporter_id']);
+    }
+
+    private static function reportButtons(Ctx $c, int $reportId, bool $panel): array
+    {
+        $rows = [
+            [
+                Ui::btn($c, '🚫 Ban link', 'adm:bl:' . $reportId, 'danger'),
+                Ui::btn($c, '⛔ Ban uploader', 'adm:bu:' . $reportId, 'danger'),
+            ],
+            [Ui::btn($c, 'Ignore', 'adm:ig:' . $reportId)],
+        ];
+        if ($panel) {
+            $rows[] = [Ui::back($c, 'adm:rep')];
+        }
+        return $rows;
+    }
+
+    /** Panel: open reports, newest first, one button each. */
     private static function reports(Ctx $c): void
     {
         $reports = Db::all(
-            "SELECT r.*, l.code, l.title, b.username FROM reports r
-             JOIN links l ON l.id = r.link_id JOIN bots b ON b.id = l.bot_id
-             WHERE r.status = 'open' ORDER BY r.id LIMIT 8"
+            "SELECT r.id, r.reason, r.reporter_id, l.owner_id, l.bot_id, l.title FROM reports r
+             JOIN links l ON l.id = r.link_id
+             WHERE r.status = 'open' ORDER BY r.id DESC LIMIT 5"
         );
         $lines = [];
         $rows = [];
         foreach ($reports as $r) {
-            $lines[] = "#{$r['id']} · {$r['reason']} · @{$r['username']} · <code>{$r['code']}</code> · " . Ui::esc(mb_strimwidth($r['title'], 0, 30, '…'));
-            $rows[] = [
-                Ui::btn($c, "🚫 Ban #{$r['id']}", 'adm:bl:' . $r['id'], 'danger'),
-                Ui::btn($c, "Ignore #{$r['id']}", 'adm:ig:' . $r['id']),
-            ];
+            $lines[] = "<b>#{$r['id']}</b> · {$r['reason']} · " . Ui::esc(mb_strimwidth($r['title'], 0, 24, '…')) . "\n"
+                . '📤 ' . self::person((int) $r['owner_id'], (int) $r['bot_id']) . "\n"
+                . '🚩 ' . self::person((int) $r['reporter_id'], (int) $r['bot_id']);
+            $rows[] = [Ui::btn($c, "🔎 Open report #{$r['id']}", 'adm:rd:' . $r['id'])];
         }
         $rows[] = [Ui::back($c, 'adm:home')];
-        $text = $lines ? implode("\n", $lines) : 'No open reports.';
+        $text = $lines ? implode("\n\n", $lines) : 'No open reports.';
         $caption = Ui::title($c, 'report', '⚠️', 'Reports') . "\n\n" . Ui::quote($text);
         Ui::show($c, 'report', $caption, $rows);
+    }
+
+    private static function reportScreen(Ctx $c, int $reportId): void
+    {
+        $text = self::reportText($reportId);
+        if ($text === null) {
+            $c->answer('Report not found');
+            return;
+        }
+        Ui::show($c, 'report', $text, self::reportButtons($c, $reportId, true));
+    }
+
+    /** /link <code or link>: who uploaded it, what is in it, reports. */
+    private static function linkInfo(Ctx $c, string $arg): void
+    {
+        $code = strtolower(trim(preg_replace('/^.*start=/', '', $arg)));
+        $l = $code === '' ? null : Db::one(
+            'SELECT l.*, b.username FROM links l JOIN bots b ON b.id = l.bot_id WHERE l.code = ? ORDER BY l.id DESC LIMIT 1',
+            [$code]
+        );
+        if ($l === null) {
+            $c->say('Usage: <code>/link abc123</code> or <code>/link https://t.me/bot?start=abc123</code>');
+            return;
+        }
+        $reports = (int) Db::val('SELECT COUNT(*) FROM reports WHERE link_id = ?', [(int) $l['id']]);
+        $c->say(
+            "🔗 <b>Link</b> · @{$l['username']}\n"
+            . "https://t.me/{$l['username']}?start={$l['code']}\n"
+            . Ui::esc($l['title']) . "\n"
+            . self::linkContents((int) $l['id']) . "\n"
+            . 'Made ' . date('M j Y, H:i', strtotime($l['created_at'])) . " UTC · $reports report(s)"
+            . ($l['banned'] ? ' · ⛔ banned' : '') . "\n\n"
+            . "📤 <b>Uploaded by</b>\n"
+            . self::person((int) $l['owner_id'], (int) $l['bot_id']) . "\n"
+            . self::uploaderStats((int) $l['owner_id'])
+        );
+    }
+
+    /** /user <id or @username>: everything about one person. */
+    private static function userInfo(Ctx $c, string $arg): void
+    {
+        $arg = trim($arg);
+        $userId = ctype_digit($arg) ? (int) $arg : (int) Db::val(
+            'SELECT user_id FROM users WHERE lower(username) = lower(?) ORDER BY last_seen DESC LIMIT 1',
+            [ltrim($arg, '@')]
+        );
+        $seen = $userId ? Db::one('SELECT MIN(created_at) AS first, MAX(last_seen) AS last FROM users WHERE user_id = ?', [$userId]) : null;
+        if (!$userId || $seen['first'] === null) {
+            $c->say('Usage: <code>/user 123456789</code> or <code>/user @username</code>');
+            return;
+        }
+        $bots = Db::all(
+            "SELECT username, status FROM bots WHERE owner_id = ? AND is_main = FALSE ORDER BY id",
+            [$userId]
+        );
+        $recent = Db::all(
+            'SELECT l.code, l.title, b.username, l.banned,
+                    (SELECT COUNT(*) FROM files f WHERE f.link_id = l.id) AS files,
+                    (SELECT COUNT(*) FROM reports r WHERE r.link_id = l.id) AS reports
+             FROM links l JOIN bots b ON b.id = l.bot_id WHERE l.owner_id = ? ORDER BY l.id DESC LIMIT 5',
+            [$userId]
+        );
+        $text = "👤 <b>User</b>\n"
+            . self::person($userId) . "\n"
+            . 'First seen ' . date('M j Y', strtotime($seen['first'])) . ' · last active ' . date('M j, H:i', strtotime($seen['last'])) . " UTC\n\n"
+            . "📤 <b>As uploader</b>\n" . self::uploaderStats($userId) . "\n\n"
+            . "🚩 <b>As reporter</b>\n" . self::reporterStats($userId);
+        if ($bots) {
+            $text .= "\n\n🤖 <b>Clone bots</b>\n" . implode("\n", array_map(
+                fn($b) => '@' . Ui::esc($b['username']) . ' · ' . $b['status'],
+                $bots
+            ));
+        }
+        if ($recent) {
+            $text .= "\n\n🔗 <b>Latest links</b>\n" . implode("\n", array_map(
+                fn($l) => "<code>{$l['code']}</code> · {$l['files']} files · {$l['reports']} reports"
+                    . ($l['banned'] ? ' · ⛔' : '') . ' · ' . Ui::esc(mb_strimwidth($l['title'], 0, 24, '…')),
+                $recent
+            ));
+        }
+        $c->say($text);
     }
 
     /** Tell the admin about a new report, from the main bot. */
@@ -339,25 +556,22 @@ final class Admin
         if (!$admin || !$main) {
             return;
         }
-        $r = Db::one(
-            'SELECT r.*, l.code, l.title, l.owner_id, b.username FROM reports r
-             JOIN links l ON l.id = r.link_id JOIN bots b ON b.id = l.bot_id WHERE r.id = ?',
-            [$reportId]
-        );
-        $text = "⚠️ <b>Report #{$r['id']}</b>\n"
-            . "Reason: {$r['reason']}\n"
-            . "Link: https://t.me/{$r['username']}?start={$r['code']}\n"
-            . 'Title: ' . Ui::esc($r['title']) . "\n"
-            . "Owner: <code>{$r['owner_id']}</code> · Reporter: <code>{$r['reporter_id']}</code>";
+        $text = self::reportText($reportId);
+        if ($text === null) {
+            return;
+        }
         (new Tg((string) Crypto::decrypt($main['token_enc'])))->call('sendMessage', [
             'chat_id' => $admin,
             'text' => $text,
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
-            'reply_markup' => ['inline_keyboard' => [[
-                ['text' => '🚫 Ban link', 'callback_data' => 'adm:bl:' . $r['id'], 'style' => 'danger'],
-                ['text' => 'Ignore', 'callback_data' => 'adm:ig:' . $r['id']],
-            ]]],
+            'reply_markup' => ['inline_keyboard' => [
+                [
+                    ['text' => '🚫 Ban link', 'callback_data' => 'adm:bl:' . $reportId, 'style' => 'danger'],
+                    ['text' => '⛔ Ban uploader', 'callback_data' => 'adm:bu:' . $reportId, 'style' => 'danger'],
+                ],
+                [['text' => 'Ignore', 'callback_data' => 'adm:ig:' . $reportId]],
+            ]],
         ]);
     }
 }

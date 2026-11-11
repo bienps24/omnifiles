@@ -74,5 +74,29 @@ $commands = [
 ];
 $tg->call('setMyCommands', ['commands' => $commands['en']]);
 $tg->call('setMyCommands', ['commands' => $commands['tl'], 'language_code' => 'tl']);
+
+// Admin: the same menu plus the admin commands, shown only in the admin's own chat
+$admin = App::adminId();
+if ($admin) {
+    $adminCommands = array_merge($commands['en'], [
+        ['command' => 'admin', 'description' => '🛠 Admin panel: stats, ads, reports'],
+        ['command' => 'emojis', 'description' => '🛠 Premium emoji: set / still normal'],
+        ['command' => 'setemoji', 'description' => '🛠 /setemoji + Premium emoji'],
+        ['command' => 'delemoji', 'description' => '🛠 /delemoji 🔗 → normal emoji again'],
+        ['command' => 'link', 'description' => '🛠 /link <code>: who uploaded it'],
+        ['command' => 'user', 'description' => '🛠 /user <id or @username>: user info'],
+        ['command' => 'banlink', 'description' => '🛠 /banlink <code or link>'],
+        ['command' => 'unbanlink', 'description' => '🛠 /unbanlink <code or link>'],
+        ['command' => 'banuser', 'description' => '🛠 /banuser <user id> (with links and bots)'],
+        ['command' => 'unbanuser', 'description' => '🛠 /unbanuser <user id>'],
+        ['command' => 'banbot', 'description' => '🛠 /banbot <@clone bot>'],
+        ['command' => 'unbanbot', 'description' => '🛠 /unbanbot <@clone bot>'],
+    ]);
+    $res = $tg->call('setMyCommands', [
+        'commands' => $adminCommands,
+        'scope' => ['type' => 'chat', 'chat_id' => $admin],
+    ]);
+    App::log('admin commands: ' . ($res['ok'] ? 'ok' : ($res['description'] ?? 'failed (open the bot once as admin, then redeploy)')));
+}
 $tg->call('setMyDescription', ['description' => "Send any file, get a share link in seconds. Free and fast ⚡\n\nPhotos, videos, documents — one file or many at once."]);
 $tg->call('setMyShortDescription', ['short_description' => 'Send any file, get a share link in seconds. Free and fast ⚡']);
