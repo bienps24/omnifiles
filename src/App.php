@@ -63,6 +63,12 @@ final class App
         return (int) self::env('PRO_PRICE_STARS', '300');
     }
 
+    /** Most files one link can hold for a free user. Pro has no limit. */
+    public static function freeFileLimit(): int
+    {
+        return (int) self::env('FREE_FILE_LIMIT', '100');
+    }
+
     /** Bot that collects Telegram Stars (it sends the invoices), e.g. omnigatepaybot */
     public static function payBot(): string
     {

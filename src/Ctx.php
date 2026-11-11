@@ -107,6 +107,21 @@ final class Ctx
         return (bool) self::account((int) $this->bot['owner_id'])['is_pro'];
     }
 
+    /**
+     * Max files per link for the current user, or null for no limit.
+     * No limit for Pro users, and on a clone whose owner is Pro.
+     */
+    public function fileLimit(): ?int
+    {
+        if ($this->uid !== null && (bool) self::account($this->uid)['is_pro']) {
+            return null;
+        }
+        if (!$this->isMain && (bool) self::account((int) $this->bot['owner_id'])['is_pro']) {
+            return null;
+        }
+        return App::freeFileLimit();
+    }
+
     /** Bot messages can't be forwarded or saved, except for Pro (same rule as ads). */
     public function protect(): bool
     {

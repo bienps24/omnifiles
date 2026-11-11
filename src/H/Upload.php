@@ -1,6 +1,7 @@
 <?php
 namespace H;
 
+use App;
 use Ctx;
 use Db;
 use Ui;
@@ -30,13 +31,14 @@ final class Upload
         ];
 
         $state = $c->state();
-        if ($state === 'many') {
-            self::buffer($c, 'many', $row);
-            self::markDirty($c);
-            return true;
-        }
-        if ($state === 'add') {
-            self::buffer($c, 'add:' . (int) $c->stateData()['link'], $row);
+        if ($state === 'many' || $state === 'add') {
+            $linkId = $state === 'add' ? (int) $c->stateData()['link'] : 0;
+            $bucket = $state === 'many' ? 'many' : 'add:' . $linkId;
+            if (self::room($c, $bucket, $linkId) <= 0) {
+                self::limitNotice($c);
+                return true;
+            }
+            self::buffer($c, $bucket, $row);
             self::markDirty($c);
             return true;
         }
@@ -53,6 +55,70 @@ final class Upload
         $link = \Links::create($c, $c->uid, [$row], false);
         self::linkReady($c, $link, true);
         return true;
+    }
+
+    /* ---------------- Free file limit ---------------- */
+
+    /** Files already in the link (0 for a new link). */
+    private static function existing(int $linkId): int
+    {
+        return $linkId > 0 ? (int) Db::val('SELECT COUNT(*) FROM files WHERE link_id = ?', [$linkId]) : 0;
+    }
+
+    /** How many more files fit in this upload, PHP_INT_MAX when there is no limit. */
+    private static function room(Ctx $c, string $bucket, int $linkId): int
+    {
+        $limit = $c->fileLimit();
+        if ($limit === null) {
+            return PHP_INT_MAX;
+        }
+        $pending = (int) Db::val(
+            'SELECT COUNT(*) FROM pending_files WHERE bot_id = ? AND user_id = ? AND bucket = ?',
+            [$c->botId(), $c->uid, $bucket]
+        );
+        return $limit - self::existing($linkId) - $pending;
+    }
+
+    /** Keep only the files that fit (files sent at the same moment can slip past the check above). */
+    private static function fit(Ctx $c, array $files, int $linkId): array
+    {
+        $limit = $c->fileLimit();
+        if ($limit === null) {
+            return $files;
+        }
+        return array_slice($files, 0, max(0, $limit - self::existing($linkId)));
+    }
+
+    /** Tell a free user once per upload that the link is full, with the way to Pro. */
+    private static function limitNotice(Ctx $c): void
+    {
+        $first = Db::q(
+            "UPDATE users SET state_data = state_data || '{\"capped\": 1}'::jsonb
+             WHERE bot_id = ? AND user_id = ? AND state_data->>'capped' IS NULL",
+            [$c->botId(), $c->uid]
+        )->rowCount();
+        if ($first === 0) {
+            return;
+        }
+        $text = '🔒 ' . $c->t('files_limit_reached', ['max' => App::freeFileLimit(), 'n' => App::proPrice()]);
+        $c->say($text, ['inline_keyboard' => [[Ui::urlBtn(
+            $c,
+            '⭐ ' . $c->t('btn_unlimited_pro', ['n' => App::proPrice()]),
+            'https://t.me/' . App::payBot() . '?start=ofiles_pro',
+            'success',
+            'star'
+        )]]]);
+    }
+
+    /** "Files so far: 37 / 100" for free users, "Files so far: 37" for Pro. */
+    private static function soFar(Ctx $c, int $count, int $existing = 0): string
+    {
+        $limit = $c->fileLimit();
+        $n = '<b>' . ($existing + $count) . '</b>';
+        if ($limit !== null) {
+            $n .= ' / ' . $limit;
+        }
+        return $c->t('files_so_far', ['n' => $n]);
     }
 
     private static function buffer(Ctx $c, string $bucket, array $row): void
@@ -128,7 +194,7 @@ final class Upload
     public static function manyCaption(Ctx $c, int $count): string
     {
         return Ui::title($c, 'many', '📚', $c->t('t_many')) . "\n\n"
-            . Ui::quote(Ui::num(1) . ' ' . $c->t('many_step1') . "\n\n" . $c->t('files_so_far', ['n' => '<b>' . $count . '</b>'])) . "\n"
+            . Ui::quote(Ui::num(1) . ' ' . $c->t('many_step1') . "\n\n" . self::soFar($c, $count)) . "\n"
             . Ui::num(2) . ' ' . $c->t('many_step2');
     }
 
@@ -142,7 +208,7 @@ final class Upload
 
     public static function manyMake(Ctx $c): void
     {
-        $files = self::pending($c, 'many');
+        $files = self::fit($c, self::pending($c, 'many'), 0);
         if (!$files) {
             $c->answer($c->t('need_one_file'), true);
             return;
@@ -180,7 +246,7 @@ final class Upload
     {
         return Ui::title($c, 'add', '➕', $c->t('t_add_files')) . "\n\n"
             . Ui::quote($c->t('add_step', ['title' => '<b>' . Ui::esc($link['title']) . '</b>']) . "\n\n"
-                . $c->t('files_so_far', ['n' => '<b>' . $count . '</b>']));
+                . self::soFar($c, $count, self::existing((int) $link['id'])));
     }
 
     public static function addButtons(Ctx $c, int $linkId): array
@@ -197,10 +263,10 @@ final class Upload
         if (!$link) {
             return;
         }
-        $files = self::pending($c, 'add:' . $linkId);
+        $files = self::fit($c, self::pending($c, 'add:' . $linkId), $linkId);
+        self::clearPending($c, 'add:' . $linkId);
         if ($files) {
             \Links::addFiles($c, $linkId, $c->uid, $files);
-            self::clearPending($c, 'add:' . $linkId);
         }
         $c->setState(null);
         Links::view($c, $linkId);
