@@ -138,7 +138,7 @@ final class Router
             'menu_settings' => fn() => H\Limits::show($c, 'd'),
         ];
         foreach ($menu as $key => $run) {
-            if ($text !== '' && in_array($text, Lang::allOf($key), true)) {
+            if ($text !== '' && in_array(Emoji::strip($text), array_map([Emoji::class, 'strip'], Lang::allOf($key)), true)) {
                 if (in_array($c->state(), ['many', 'add'], true)) {
                     $c->setState(null);
                 }

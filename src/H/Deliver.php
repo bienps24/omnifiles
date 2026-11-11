@@ -156,7 +156,7 @@ final class Deliver
         }
         $info = $c->tg->get('sendMessage', [
             'chat_id' => $c->chatId,
-            'text' => $text . Ui::credit($c),
+            'text' => \Emoji::render($c, $text . Ui::credit($c)),
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
             'protect_content' => $c->protect(),

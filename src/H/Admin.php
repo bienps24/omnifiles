@@ -16,9 +16,10 @@ use Ui;
  *   /banlink <code|url>     /unbanlink <code|url>
  *   /banuser <user id>      /unbanuser <user id>
  *   /banbot <@username|id>  /unbanbot <@username|id>
- *   /emojis                 which animated emoji are set
- *   /setemoji <key> <emoji> set the animated (custom) emoji for a key, e.g. /setemoji link 🔗
- *   /delemoji <key>         back to the normal emoji
+ *   /emojis                 every emoji the bot uses: Premium or still normal
+ *   /setemoji 🔗📁✅         (Premium emoji) each replaces the normal emoji it is based on
+ *   /setemoji 🗂 <Premium>   the Premium emoji replaces 🗂
+ *   /delemoji 🔗             back to the normal emoji
  *   send a message with custom emoji → the bot replies with their ids
  */
 final class Admin
@@ -45,10 +46,15 @@ final class Admin
                 self::emojiSet($c, $arg);
                 return true;
             case '/delemoji':
-                $key = strtolower(trim($arg));
-                Db::q('DELETE FROM settings WHERE key = ?', ['emoji:' . $key]);
-                Ui::emojiReload();
-                $c->say("✅ <code>" . Ui::esc($key) . "</code> uses the normal emoji again.");
+                $removed = [];
+                preg_match_all(\Emoji::RE, $arg, $m);
+                foreach ($m[0] as $emoji) {
+                    \Emoji::delete($emoji);
+                    $removed[] = $emoji;
+                }
+                $c->say($removed
+                    ? '<code>' . implode(' ', $removed) . '</code> use the normal emoji again.'
+                    : 'Usage: <code>/delemoji 🔗</code> (one or more normal emoji)');
                 return true;
             case '/banlink':
             case '/unbanlink':
@@ -81,54 +87,79 @@ final class Admin
         return false;
     }
 
-    /** /emojis: every key, with its animated emoji if one is set. */
+    /** /emojis: every emoji the bot uses, Premium (✅ shown animated) or not yet (⬜). */
     private static function emojiList(Ctx $c): void
     {
-        Ui::emojiReload();
-        $lines = [];
-        $missing = 0;
-        foreach (Ui::emojiKeys() as $key) {
-            $id = Ui::emojiId($key);
+        \Emoji::reload();
+        $used = \Emoji::used();
+        $done = [];
+        $todo = [];
+        foreach ($used as $norm => $emoji) {
+            $id = \Emoji::id($emoji);
             if ($id === null) {
-                $missing++;
-                $lines[] = "⬜ <code>$key</code>";
+                $todo[] = $emoji;
             } else {
-                $lines[] = '<tg-emoji emoji-id="' . $id . "\">✅</tg-emoji> <code>$key</code>";
+                $done[] = '<tg-emoji emoji-id="' . $id . '">' . $emoji . '</tg-emoji>';
             }
         }
-        $c->say(
-            "<b>Animated emoji</b> (" . (count($lines) - $missing) . '/' . count($lines) . " set)\n\n"
-            . implode("\n", $lines) . "\n\n"
-            . "Set one: <code>/setemoji link</code> + the animated emoji in the same message.\n"
-            . "Remove: <code>/delemoji link</code>"
-        );
+        $text = '<b>Premium emoji: ' . count($done) . ' / ' . count($used) . "</b>\n\n";
+        if ($done) {
+            $text .= "✅ Premium:\n" . implode(' ', $done) . "\n\n";
+        }
+        if ($todo) {
+            $text .= "⬜ Still normal:\n<code>" . implode(' ', $todo) . "</code>\n\n";
+        }
+        $text .= "Set: <code>/setemoji</code> + Premium emoji (many at once is fine).\n"
+            . "Pick a different look: <code>/setemoji 🗂</code> + the Premium emoji to show instead.\n"
+            . "Remove: <code>/delemoji 🔗</code>";
+        // Sent as-is: the ✅ list is already Premium, the ⬜ list must stay normal
+        $c->tg->call('sendMessage', [
+            'chat_id' => $c->chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+        ]);
     }
 
-    /** /setemoji <key> <custom emoji> */
+    /**
+     * /setemoji + Premium emoji.
+     *   /setemoji 🔗📁✅        each Premium emoji replaces the normal emoji it is based on
+     *   /setemoji 🗂 <Premium>  the Premium emoji replaces 🗂, whatever it is based on
+     */
     private static function emojiSet(Ctx $c, string $arg): void
     {
-        $key = strtolower((string) preg_split('/\s+/', trim($arg))[0]);
-        if (!in_array($key, Ui::emojiKeys(), true)) {
-            $c->say("❌ Unknown key. Send /emojis to see the keys.");
-            return;
-        }
-        $id = null;
+        $text = (string) ($c->message['text'] ?? '');
+        $utf16 = mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+        $customs = [];
         foreach ($c->message['entities'] ?? [] as $e) {
             if (($e['type'] ?? '') === 'custom_emoji') {
-                $id = (string) $e['custom_emoji_id'];
-                break;
+                $alt = mb_convert_encoding(substr($utf16, $e['offset'] * 2, $e['length'] * 2), 'UTF-8', 'UTF-16LE');
+                $customs[] = ['offset' => (int) $e['offset'], 'alt' => $alt, 'id' => (string) $e['custom_emoji_id']];
             }
         }
-        if ($id === null) {
-            $c->say("❌ Put an animated (Premium) emoji in the same message, e.g. <code>/setemoji $key</code> 🔗");
+        if (!$customs) {
+            $c->say("Send Premium (animated) emoji with the command, e.g. <code>/setemoji</code> 🔗📁✅\n\nSend /emojis to see which ones the bot uses.");
             return;
         }
-        Db::q(
-            'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
-            ['emoji:' . $key, $id]
-        );
-        Ui::emojiReload();
-        $c->say('<tg-emoji emoji-id="' . $id . "\">✅</tg-emoji> <code>$key</code> saved. It shows up right away.");
+
+        // Explicit form: a normal emoji written before the first Premium one
+        $firstOffset = $customs[0]['offset'];
+        $before = mb_convert_encoding(substr($utf16, 0, $firstOffset * 2), 'UTF-8', 'UTF-16LE');
+        $before = trim(preg_replace('#^/setemoji(@\w+)?#i', '', $before));
+        $saved = [];
+        if ($before !== '' && preg_match(\Emoji::RE, $before, $m) && count($customs) === 1) {
+            \Emoji::save($m[0], $customs[0]['id']);
+            $saved[] = '<tg-emoji emoji-id="' . $customs[0]['id'] . '">' . $m[0] . '</tg-emoji> → ' . $m[0];
+        } else {
+            foreach ($customs as $custom) {
+                \Emoji::save($custom['alt'], $custom['id']);
+                $saved[] = '<tg-emoji emoji-id="' . $custom['id'] . '">' . $custom['alt'] . '</tg-emoji> → ' . $custom['alt'];
+            }
+        }
+        $c->tg->call('sendMessage', [
+            'chat_id' => $c->chatId,
+            'text' => "✅ Saved, live now:\n" . implode("\n", $saved) . "\n\nSend /emojis to see what is left.",
+            'parse_mode' => 'HTML',
+        ]);
     }
 
     /** Reply with the ids of custom emoji in the admin's message. */

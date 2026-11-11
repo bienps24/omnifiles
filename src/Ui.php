@@ -37,58 +37,15 @@ final class Ui
         'report' => '29_report',
     ];
 
-    private static ?array $emoji = null;
-    private static int $emojiLoadedAt = 0;
 
     public static function esc(?string $text): string
     {
         return htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    /** Every emoji key the bot uses (from config/emoji.json). */
-    public static function emojiKeys(): array
-    {
-        $file = App::root() . '/config/emoji.json';
-        $json = is_file($file) ? (json_decode((string) file_get_contents($file), true) ?: []) : [];
-        return array_values(array_filter(array_keys($json), fn($k) => $k[0] !== '_'));
-    }
-
-    /**
-     * Custom emoji id for a key: set by the admin with /setemoji (saved in the database),
-     * else config/emoji.json. Empty = use the normal emoji. Reloaded every minute.
-     */
-    public static function emojiId(string $key): ?string
-    {
-        if (self::$emoji === null || time() - self::$emojiLoadedAt > 60) {
-            $file = App::root() . '/config/emoji.json';
-            $ids = is_file($file) ? (json_decode((string) file_get_contents($file), true) ?: []) : [];
-            try {
-                foreach (Db::all("SELECT key, value FROM settings WHERE key LIKE 'emoji:%'") as $row) {
-                    $ids[substr($row['key'], 6)] = $row['value'];
-                }
-            } catch (Throwable $e) {
-                // settings table not there yet: keep the file values
-            }
-            self::$emoji = $ids;
-            self::$emojiLoadedAt = time();
-        }
-        $id = self::$emoji[$key] ?? '';
-        return $id === '' ? null : (string) $id;
-    }
-
-    /** Forget cached emoji ids (after /setemoji). */
-    public static function emojiReload(): void
-    {
-        self::$emoji = null;
-    }
-
-    /** Emoji for captions: animated custom emoji on the main bot (owner has Premium), plain emoji elsewhere. */
+    /** Emoji in a caption. Emoji::render() turns it into the Premium one when it is mapped. */
     public static function e(Ctx $c, string $key, string $fallback): string
     {
-        $id = self::emojiId($key);
-        if ($c->isMain && $id !== null) {
-            return '<tg-emoji emoji-id="' . $id . '">' . $fallback . '</tg-emoji>';
-        }
         return $fallback;
     }
 
@@ -129,7 +86,7 @@ final class Ui
 
     public static function back(Ctx $c, string $data): array
     {
-        return self::btn($c, '← ' . $c->t('btn_back'), $data, null, 'back');
+        return self::btn($c, '⬅️ ' . $c->t('btn_back'), $data, null, 'back');
     }
 
     private static function decorate(Ctx $c, array $button, ?string $style, ?string $icon): array
@@ -137,13 +94,8 @@ final class Ui
         if ($style !== null) {
             $button['style'] = $style;
         }
-        if ($icon !== null && $c->isMain) {
-            $id = self::emojiId($icon);
-            if ($id !== null) {
-                $button['icon_custom_emoji_id'] = $id;
-            }
-        }
-        return $button;
+        // The button's own leading emoji becomes its Premium icon (and leaves the text)
+        return Emoji::button($c, $button);
     }
 
     /** Share link via Telegram's share sheet. */
@@ -164,6 +116,11 @@ final class Ui
             $rows[] = [['text' => $c->t('menu_help')]];
         }
         $rows[] = [['text' => $c->t('menu_settings')]];
+        foreach ($rows as $r => $row) {
+            foreach ($row as $b => $button) {
+                $rows[$r][$b] = Emoji::button($c, $button);
+            }
+        }
         return [
             'keyboard' => $rows,
             'resize_keyboard' => true,
@@ -205,6 +162,7 @@ final class Ui
      */
     public static function show(Ctx $c, string $banner, string $caption, array $rows = [], bool $forceNew = false, bool $keep = false): ?array
     {
+        $caption = Emoji::render($c, $caption);
         $markup = isset($rows['reply']) ? $rows['reply'] : ['inline_keyboard' => array_values($rows)];
         $canEdit = !$forceNew && !isset($rows['reply']) && $c->callback && !empty($c->callback['message']['photo']);
         $previous = (int) ($c->user['ui_msg_id'] ?? 0);

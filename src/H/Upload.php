@@ -233,7 +233,7 @@ final class Upload
         $c->tg->call('editMessageCaption', [
             'chat_id' => $c->chatId,
             'message_id' => $msgId,
-            'caption' => $caption,
+            'caption' => \Emoji::render($c, $caption),
             'parse_mode' => 'HTML',
             'reply_markup' => ['inline_keyboard' => $buttons],
         ]);

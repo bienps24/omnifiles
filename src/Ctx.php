@@ -146,7 +146,7 @@ final class Ctx
     {
         return $this->tg->get('sendMessage', [
             'chat_id' => $this->chatId,
-            'text' => $html,
+            'text' => Emoji::render($this, $html),
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
             'protect_content' => $this->protect(),
