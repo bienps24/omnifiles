@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => '整个 OmniFiles 都没有广告。',
+    'pro_point_forward' => '可以转发和保存机器人的消息。',
     'pro_point2' => '一次付费，永久拥有。',
     'pro_point3' => '{n} Stars。',
     'pro_active' => '你已是 Pro ✨ 永久无广告。谢谢！',

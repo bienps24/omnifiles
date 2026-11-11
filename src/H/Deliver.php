@@ -159,7 +159,7 @@ final class Deliver
             'text' => $text . Ui::credit($c),
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
-            'protect_content' => true,
+            'protect_content' => $c->protect(),
             'reply_markup' => ['inline_keyboard' => $rows],
         ]);
         if ($info && !$link['resend']) {

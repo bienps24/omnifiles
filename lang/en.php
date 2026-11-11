@@ -241,6 +241,7 @@ return [
     // Pro + payments
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'No ads, anywhere in OmniFiles.',
+    'pro_point_forward' => 'Forward and save the bot\'s messages.',
     'pro_point2' => 'Paid once, yours forever.',
     'pro_point3' => '{n} Stars.',
     'pro_active' => "You're Pro ✨ No ads, forever. Thank you!",

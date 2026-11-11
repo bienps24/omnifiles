@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'OmniFiles全体で広告なし。',
+    'pro_point_forward' => 'Botのメッセージを転送・保存できます。',
     'pro_point2' => '1回の支払いでずっと使えます。',
     'pro_point3' => '{n} Stars。',
     'pro_active' => 'Proです ✨ ずっと広告なし。ありがとうございます！',

@@ -16,7 +16,10 @@ use Ui;
  *   /banlink <code|url>     /unbanlink <code|url>
  *   /banuser <user id>      /unbanuser <user id>
  *   /banbot <@username|id>  /unbanbot <@username|id>
- *   send a message with custom emoji → the bot replies with their ids (for config/emoji.json)
+ *   /emojis                 which animated emoji are set
+ *   /setemoji <key> <emoji> set the animated (custom) emoji for a key, e.g. /setemoji link 🔗
+ *   /delemoji <key>         back to the normal emoji
+ *   send a message with custom emoji → the bot replies with their ids
  */
 final class Admin
 {
@@ -35,6 +38,18 @@ final class Admin
             return false;
         }
         switch ($command) {
+            case '/emojis':
+                self::emojiList($c);
+                return true;
+            case '/setemoji':
+                self::emojiSet($c, $arg);
+                return true;
+            case '/delemoji':
+                $key = strtolower(trim($arg));
+                Db::q('DELETE FROM settings WHERE key = ?', ['emoji:' . $key]);
+                Ui::emojiReload();
+                $c->say("✅ <code>" . Ui::esc($key) . "</code> uses the normal emoji again.");
+                return true;
             case '/banlink':
             case '/unbanlink':
                 $ban = $command === '/banlink';
@@ -64,6 +79,56 @@ final class Admin
                 return true;
         }
         return false;
+    }
+
+    /** /emojis: every key, with its animated emoji if one is set. */
+    private static function emojiList(Ctx $c): void
+    {
+        Ui::emojiReload();
+        $lines = [];
+        $missing = 0;
+        foreach (Ui::emojiKeys() as $key) {
+            $id = Ui::emojiId($key);
+            if ($id === null) {
+                $missing++;
+                $lines[] = "⬜ <code>$key</code>";
+            } else {
+                $lines[] = '<tg-emoji emoji-id="' . $id . "\">✅</tg-emoji> <code>$key</code>";
+            }
+        }
+        $c->say(
+            "<b>Animated emoji</b> (" . (count($lines) - $missing) . '/' . count($lines) . " set)\n\n"
+            . implode("\n", $lines) . "\n\n"
+            . "Set one: <code>/setemoji link</code> + the animated emoji in the same message.\n"
+            . "Remove: <code>/delemoji link</code>"
+        );
+    }
+
+    /** /setemoji <key> <custom emoji> */
+    private static function emojiSet(Ctx $c, string $arg): void
+    {
+        $key = strtolower((string) preg_split('/\s+/', trim($arg))[0]);
+        if (!in_array($key, Ui::emojiKeys(), true)) {
+            $c->say("❌ Unknown key. Send /emojis to see the keys.");
+            return;
+        }
+        $id = null;
+        foreach ($c->message['entities'] ?? [] as $e) {
+            if (($e['type'] ?? '') === 'custom_emoji') {
+                $id = (string) $e['custom_emoji_id'];
+                break;
+            }
+        }
+        if ($id === null) {
+            $c->say("❌ Put an animated (Premium) emoji in the same message, e.g. <code>/setemoji $key</code> 🔗");
+            return;
+        }
+        Db::q(
+            'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+            ['emoji:' . $key, $id]
+        );
+        Ui::emojiReload();
+        $c->say('<tg-emoji emoji-id="' . $id . "\">✅</tg-emoji> <code>$key</code> saved. It shows up right away.");
     }
 
     /** Reply with the ids of custom emoji in the admin's message. */

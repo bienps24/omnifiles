@@ -238,6 +238,7 @@ return [
 
     // Pro + payments
     'pro_point1' => 'Walang ads kahit saan sa OmniFiles.',
+    'pro_point_forward' => 'Puwede nang i-forward at i-save ang mga message ng bot.',
     'pro_point2' => 'Isang bayad lang, sa iyo habambuhay.',
     'pro_point3' => '{n} Stars.',
     'pro_active' => 'Pro ka na ✨ Walang ads, habambuhay. Salamat!',

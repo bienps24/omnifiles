@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'Tanpa iklan di seluruh OmniFiles.',
+    'pro_point_forward' => 'Teruskan dan simpan pesan bot.',
     'pro_point2' => 'Bayar sekali, milikmu selamanya.',
     'pro_point3' => '{n} Stars.',
     'pro_active' => 'Kamu Pro ✨ Tanpa iklan selamanya. Terima kasih!',

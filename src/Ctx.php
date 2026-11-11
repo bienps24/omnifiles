@@ -107,6 +107,12 @@ final class Ctx
         return (bool) self::account((int) $this->bot['owner_id'])['is_pro'];
     }
 
+    /** Bot messages can't be forwarded or saved, except for Pro (same rule as ads). */
+    public function protect(): bool
+    {
+        return !$this->adFree();
+    }
+
     /** Admin of this bot: the OmniFiles admin on the main bot, the owner on a clone. */
     public function isAdmin(): bool
     {
@@ -143,7 +149,7 @@ final class Ctx
             'text' => $html,
             'parse_mode' => 'HTML',
             'link_preview_options' => ['is_disabled' => true],
-            'protect_content' => true,
+            'protect_content' => $this->protect(),
             'reply_markup' => $markup,
         ]);
     }

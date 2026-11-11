@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'بلا إعلانات في كل OmniFiles.',
+    'pro_point_forward' => 'أعد توجيه رسائل البوت واحفظها.',
     'pro_point2' => 'ادفع مرة واحدة، ويبقى لك للأبد.',
     'pro_point3' => '{n} نجمة.',
     'pro_active' => 'أنت Pro ✨ بلا إعلانات للأبد. شكرًا لك!',

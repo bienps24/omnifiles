@@ -38,21 +38,48 @@ final class Ui
     ];
 
     private static ?array $emoji = null;
+    private static int $emojiLoadedAt = 0;
 
     public static function esc(?string $text): string
     {
         return htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    /** Custom emoji id from config/emoji.json (empty = use the normal emoji). */
-    private static function emojiId(string $key): ?string
+    /** Every emoji key the bot uses (from config/emoji.json). */
+    public static function emojiKeys(): array
     {
-        if (self::$emoji === null) {
+        $file = App::root() . '/config/emoji.json';
+        $json = is_file($file) ? (json_decode((string) file_get_contents($file), true) ?: []) : [];
+        return array_values(array_filter(array_keys($json), fn($k) => $k[0] !== '_'));
+    }
+
+    /**
+     * Custom emoji id for a key: set by the admin with /setemoji (saved in the database),
+     * else config/emoji.json. Empty = use the normal emoji. Reloaded every minute.
+     */
+    public static function emojiId(string $key): ?string
+    {
+        if (self::$emoji === null || time() - self::$emojiLoadedAt > 60) {
             $file = App::root() . '/config/emoji.json';
-            self::$emoji = is_file($file) ? (json_decode((string) file_get_contents($file), true) ?: []) : [];
+            $ids = is_file($file) ? (json_decode((string) file_get_contents($file), true) ?: []) : [];
+            try {
+                foreach (Db::all("SELECT key, value FROM settings WHERE key LIKE 'emoji:%'") as $row) {
+                    $ids[substr($row['key'], 6)] = $row['value'];
+                }
+            } catch (Throwable $e) {
+                // settings table not there yet: keep the file values
+            }
+            self::$emoji = $ids;
+            self::$emojiLoadedAt = time();
         }
         $id = self::$emoji[$key] ?? '';
         return $id === '' ? null : (string) $id;
+    }
+
+    /** Forget cached emoji ids (after /setemoji). */
+    public static function emojiReload(): void
+    {
+        self::$emoji = null;
     }
 
     /** Emoji for captions: animated custom emoji on the main bot (owner has Premium), plain emoji elsewhere. */
@@ -210,7 +237,7 @@ final class Ui
             'photo' => $files ? null : $media,
             'caption' => $caption,
             'parse_mode' => 'HTML',
-            'protect_content' => true,
+            'protect_content' => $c->protect(),
             'reply_markup' => $markup,
         ];
         $res = $c->tg->call('sendPhoto', $params, $files ? ['photo' => $files['photo']] : []);

@@ -36,7 +36,7 @@ final class Pay
             return;
         }
         $caption = Ui::title($c, 'star', '⭐', $c->t('t_pro')) . "\n\n"
-            . Ui::quote('• ' . $c->t('pro_point1') . "\n• " . $c->t('pro_point2') . "\n• " . $c->t('pro_point3', ['n' => App::proPrice()]))
+            . Ui::quote('• ' . $c->t('pro_point1') . "\n• " . $c->t('pro_point_forward') . "\n• " . $c->t('pro_point2') . "\n• " . $c->t('pro_point3', ['n' => App::proPrice()]))
             . "\n" . $c->t('pay_terms');
         Ui::show($c, 'pro', $caption, [
             [Ui::btn($c, '⭐ ' . $c->t('btn_buy_pro', ['n' => App::proPrice()]), 'buy:pro', 'success', 'star')],

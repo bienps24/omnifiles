@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'पूरे OmniFiles में कोई विज्ञापन नहीं।',
+    'pro_point_forward' => 'बॉट के मैसेज फ़ॉरवर्ड और सेव करें।',
     'pro_point2' => 'एक बार भुगतान, हमेशा के लिए आपका।',
     'pro_point3' => '{n} Stars.',
     'pro_active' => 'आप Pro हैं ✨ हमेशा के लिए बिना विज्ञापन। धन्यवाद!',

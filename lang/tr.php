@@ -226,6 +226,7 @@ return [
 
     't_pro' => 'OmniFiles Pro',
     'pro_point1' => 'OmniFiles\'ın hiçbir yerinde reklam yok.',
+    'pro_point_forward' => 'Botun mesajlarını ilet ve kaydet.',
     'pro_point2' => 'Bir kez öde, sonsuza dek senin.',
     'pro_point3' => '{n} Stars.',
     'pro_active' => 'Pro\'sun ✨ Sonsuza dek reklamsız. Teşekkürler!',
