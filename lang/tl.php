@@ -299,6 +299,8 @@ return [
     'btn_buy_pro' => 'Kumuha ng Pro · {n} ⭐',
 
     // Misc
+    'pay_via' => 'Ang payment bot natin na {bot} ang tatanggap ng bayad. I-tap ang button sa ibaba, tapos magbayad doon gamit ang Stars.',
+    'btn_pay' => 'Magbayad ng {n} Stars',
     'made_by' => 'Gawa ng {bot}',
     'cancelled' => 'Na-cancel',
     'you_are_banned' => '🚫 Na-ban ka sa bot na ito.',

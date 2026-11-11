@@ -303,6 +303,8 @@ return [
     'btn_buy_pro' => 'Get Pro · {n} ⭐',
 
     // Misc
+    'pay_via' => 'Payment is handled by our payment bot {bot}. Tap the button below, then pay there with Stars.',
+    'btn_pay' => 'Pay {n} Stars',
     'made_by' => 'Made by {bot}',
     'cancelled' => 'Cancelled',
     'you_are_banned' => '🚫 You were banned from this bot.',

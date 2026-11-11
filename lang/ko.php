@@ -286,6 +286,8 @@ return [
     'btn_buy_slot' => '봇 1개 더 구매 · {n} ⭐',
     'btn_buy_pro' => 'Pro 받기 · {n} ⭐',
 
+    'pay_via' => '결제는 결제 봇 {bot}에서 처리해요. 아래 버튼을 누른 뒤 그곳에서 Stars로 결제하세요.',
+    'btn_pay' => '{n} Stars 결제',
     'made_by' => '{bot}로 만듦',
     'cancelled' => '취소했어요',
     'you_are_banned' => '🚫 이 봇에서 차단되었어요.',

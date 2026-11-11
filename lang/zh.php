@@ -286,6 +286,8 @@ return [
     'btn_buy_slot' => '再买 1 个机器人 · {n} ⭐',
     'btn_buy_pro' => '获取 Pro · {n} ⭐',
 
+    'pay_via' => '付款由我们的支付机器人 {bot} 处理。点击下方按钮，然后在那里用 Stars 付款。',
+    'btn_pay' => '支付 {n} Stars',
     'made_by' => '由 {bot} 制作',
     'cancelled' => '已取消',
     'you_are_banned' => '🚫 你已被此机器人封禁。',

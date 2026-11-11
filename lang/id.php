@@ -286,6 +286,8 @@ return [
     'btn_buy_slot' => 'Beli 1 bot lagi · {n} ⭐',
     'btn_buy_pro' => 'Dapatkan Pro · {n} ⭐',
 
+    'pay_via' => 'Pembayaran diurus oleh bot pembayaran kami {bot}. Ketuk tombol di bawah, lalu bayar di sana dengan Stars.',
+    'btn_pay' => 'Bayar {n} Stars',
     'made_by' => 'Dibuat oleh {bot}',
     'cancelled' => 'Dibatalkan',
     'you_are_banned' => '🚫 Kamu diblokir dari bot ini.',

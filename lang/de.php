@@ -286,6 +286,8 @@ return [
     'btn_buy_slot' => '1 weiteren Bot kaufen · {n} ⭐',
     'btn_buy_pro' => 'Pro holen · {n} ⭐',
 
+    'pay_via' => 'Die Zahlung läuft über unseren Bezahl-Bot {bot}. Tippe unten auf den Button und bezahle dort mit Stars.',
+    'btn_pay' => '{n} Stars bezahlen',
     'made_by' => 'Erstellt mit {bot}',
     'cancelled' => 'Abgebrochen',
     'you_are_banned' => '🚫 Du wurdest in diesem Bot gesperrt.',

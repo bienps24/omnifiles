@@ -102,7 +102,7 @@ final class Admin
                 'opens' => (int) Db::val('SELECT COUNT(*) FROM open_events'),
                 'clones' => (int) Db::val('SELECT COUNT(*) FROM bots WHERE is_main = FALSE'),
                 'pro' => (int) Db::val('SELECT COUNT(*) FROM accounts WHERE is_pro'),
-                'stars' => (int) Db::val('SELECT COALESCE(SUM(stars), 0) FROM payments'),
+                'stars' => (int) Db::val('SELECT COALESCE(SUM(stars), 0) FROM payments WHERE NOT refunded'),
                 'reports' => (int) Db::val("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
             ];
             $text = "👥 Main bot users: {$s['main_users']}\n"

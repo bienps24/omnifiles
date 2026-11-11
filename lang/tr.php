@@ -286,6 +286,8 @@ return [
     'btn_buy_slot' => '1 bot daha al · {n} ⭐',
     'btn_buy_pro' => 'Pro al · {n} ⭐',
 
+    'pay_via' => 'Ödemeyi ödeme botumuz {bot} alır. Aşağıdaki düğmeye dokun, sonra orada Stars ile öde.',
+    'btn_pay' => '{n} Stars öde',
     'made_by' => '{bot} ile yapıldı',
     'cancelled' => 'İptal edildi',
     'you_are_banned' => '🚫 Bu bottan engellendin.',

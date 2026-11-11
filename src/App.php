@@ -63,6 +63,12 @@ final class App
         return (int) self::env('PRO_PRICE_STARS', '300');
     }
 
+    /** Bot that collects Telegram Stars (it sends the invoices), e.g. omnigatepaybot */
+    public static function payBot(): string
+    {
+        return ltrim((string) self::env('PAY_BOT', 'omnigatepaybot'), '@');
+    }
+
     public static function slotPrice(): int
     {
         return (int) self::env('SLOT_PRICE_STARS', '999');
