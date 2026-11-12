@@ -63,10 +63,27 @@ final class App
         return (int) self::env('PRO_PRICE_STARS', '300');
     }
 
-    /** Most files one link can hold for a free user. Pro has no limit. */
+    /**
+     * Most files one link can hold for a free user. Pro has no limit.
+     * In Many Files, every full set of this many files becomes its own link.
+     */
     public static function freeFileLimit(): int
     {
-        return (int) self::env('FREE_FILE_LIMIT', '100');
+        return max(1, (int) self::env('FREE_FILE_LIMIT', '10'));
+    }
+
+    /** Anti-spam: files a user may send per minute before the cooldown starts. */
+    public static function ratePerMinute(bool $pro): int
+    {
+        return $pro
+            ? (int) self::env('RATE_PRO_PER_MIN', '300')
+            : (int) self::env('RATE_FREE_PER_MIN', '50');
+    }
+
+    /** Anti-spam: how long the cooldown lasts, in seconds. */
+    public static function cooldownSeconds(): int
+    {
+        return max(10, (int) self::env('COOLDOWN_SECONDS', '60'));
     }
 
     /** Bot that collects Telegram Stars (it sends the invoices), e.g. omnigatepaybot */

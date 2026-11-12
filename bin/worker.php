@@ -2,8 +2,10 @@
 /**
  * Background worker (Railway service with ROLE=worker). Runs forever, once per second:
  *   1. albums that finished arriving → one link each
- *   2. "Files so far" counters on Many Files / Add files screens
- *   3. auto-delete of delivered files
+ *   2. free users' Many Files: every full set of files → its own link
+ *   3. "Files so far" counters on Many Files / Add files screens
+ *   4. anti-spam cooldowns that ended → "you can send again"
+ *   5. auto-delete of delivered files
  */
 require dirname(__DIR__) . '/src/App.php';
 
@@ -45,6 +47,43 @@ function finalizeAlbums(): void
             continue;
         }
         H\Upload::finalizeAlbum($c, $g['bucket']);
+    }
+}
+
+/** Free users in Many Files: every full set of files becomes its own link. */
+function splitMany(): void
+{
+    $rows = Db::all(
+        "SELECT p.bot_id, p.user_id FROM pending_files p
+         WHERE p.bucket = 'many'
+         GROUP BY p.bot_id, p.user_id
+         HAVING COUNT(*) >= ?
+         LIMIT 50",
+        [App::freeFileLimit()]
+    );
+    foreach ($rows as $r) {
+        $c = workerCtx((int) $r['bot_id'], (int) $r['user_id']);
+        if ($c !== null) {
+            H\Upload::splitMany($c);
+        }
+    }
+}
+
+/** Cooldowns that ended: tell the user they can send again. */
+function endCooldowns(): void
+{
+    $rows = Db::all(
+        "UPDATE users SET cooldown_until = NULL
+         WHERE (bot_id, user_id) IN (
+             SELECT bot_id, user_id FROM users WHERE cooldown_until <= now() LIMIT 50
+         )
+         RETURNING bot_id, user_id"
+    );
+    foreach ($rows as $r) {
+        $c = workerCtx((int) $r['bot_id'], (int) $r['user_id']);
+        if ($c !== null) {
+            H\Upload::cooldownOver($c);
+        }
     }
 }
 
@@ -94,7 +133,9 @@ $lastCleanup = 0;
 while (true) {
     try {
         finalizeAlbums();
+        splitMany();
         refreshCounters();
+        endCooldowns();
         runDeletions();
         if (time() - $lastCleanup > 3600) {
             cleanup();
